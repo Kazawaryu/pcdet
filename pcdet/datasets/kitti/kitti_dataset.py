@@ -83,6 +83,10 @@ class KittiDataset(DatasetTemplate):
     def get_image_shape(self, idx):
         img_file = self.root_split_path / 'image_2' / ('%s.png' % idx)
         assert img_file.exists()
+        # try:
+        #     img_file.exists()
+        # except:
+        #     print("ATTENTION:", idx)
         return np.array(io.imread(img_file).shape[:2], dtype=np.int32)
 
     def get_label(self, idx):
