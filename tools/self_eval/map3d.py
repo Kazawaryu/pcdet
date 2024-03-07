@@ -125,7 +125,7 @@ def test_all_data(ap_thresh, dist_thresh, ftype, kind):
     # gt_dir = './../label_2/'
     # pkl_path = './../kitti_infos_val.pkl'
 
-    predict_dir = '/home/jiazx_ug/OpenPCDet/output/cfgs/kitti_models/pointpillar_copy/default/eval/epoch_160/val/default/final_result/data/'
+    predict_dir = '/home/jiazx_ug/OpenPCDet/output/cfgs/kitti_models/voxel_rcnn_car/default/eval/epoch_160/val/default/final_result/data/'
     gt_dir = '/home/jiazx_ug/OpenPCDet/data/kitti/training/label_2/'
     pkl_path = '/home/jiazx_ug/OpenPCDet/data/kitti/kitti_infos_val.pkl'
 
@@ -158,10 +158,13 @@ def test_all_data(ap_thresh, dist_thresh, ftype, kind):
                 box = [float(x), float(y), float(z), float(h), float(w), float(l), float(rot)]
                 if conf > CONF_THRESH:
                     predict_dict[lab].append(box)
-
+        print(gt_path)
         with open(gt_path, 'r') as file:
             gt_lines = file.readlines()
             for j in range(len(gt_lines)-1):
+                if j >= len(num_gts):
+                    print('bad performance, break iter')
+                    break
                 line = gt_lines[j].split(' ')
                 num_gt = num_gts[j]
                 if kind == 'normal':
