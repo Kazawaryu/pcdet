@@ -7,6 +7,8 @@ import kornia
 import numpy as np
 import torch
 import time
+import os
+import tqdm
 import demo as demo
 
 from pcdet.config import cfg, cfg_from_yaml_file
@@ -17,6 +19,10 @@ from pcdet.models.backbones_3d.vfe import pillar_vfe as VFE
 from pcdet.models.backbones_2d.map_to_bev import pointpillar_scatter as Scatter
 
 from sklearn import svm
+
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+torch.cuda.set_device(0)
+
 
 class isPointInQuadrangle(object):
     def __int__(self):
@@ -43,12 +49,32 @@ class isPointInQuadrangle(object):
 
 class exp:
     def __init__(self) -> None:
-        self.ckpt_path = '../self_ckpts/pointpillar_7728.pth'
-        self.cfg_path = './cfgs/kitti_models/pointpillar.yaml'
-        self.pcd_path = '/home/ghosnp/dataset/mini_kitti/velodyne/training/velodyne/000011.bin'
-        self.txt_path = '/home/ghosnp/dataset/mini_kitti/label_2/training/label_2/000011.txt'
-        self.pcd_dir = '/home/ghosnp/dataset/mini_kitti/velodyne/training/velodyne/'
-        self.txt_dir = '/home/ghosnp/dataset/mini_kitti/label_2/training/label_2/'
+        parser = argparse.ArgumentParser()
+        parser.add_argument('-d', '--data_path', type=str, default=None , help='specify the data path')
+        parser.add_argument('-m', '--model_path', type=str, default=None, help='specify the pretrained model')
+
+        args = parser.parse_args()
+
+        if args.model_path[0] == 'A' or args.model_path[0] == 'C':
+            self.ckpt_path = './../ada_tools/checkpoint_epoch_240.pth'
+            self.cfg_path = './cfgs/kitti_models/pointpillar_copy2.yaml'
+            #self.ckpt_path = './../output/kitti_models/pointpillar_copy2/'+args.model_path+'/ckpt/checkpoint_epoch_160.pth'
+            #self.cfg_path = './cfgs/kitti_models/pointpillar_copy2.yaml'
+        else:
+            self.ckpt_path = './../ada_tools/checkpoint_epoch_240.pth'
+            self.cfg_path = './cfgs/kitti_models/pointpillar_copy2.yaml'
+            #self.ckpt_path = './../output/kitti_models/pointpillar_copy/'+args.model_path+'/ckpt/checkpoint_epoch_160.pth'
+            #self.cfg_path = './cfgs/kitti_models/pointpillar_copy.yaml'
+
+        self.pcd_path = '/home/jiazx_ug/OpenPCDet/data/kitti/testing/velodyne/228931.bin'
+        # self.txt_path = '/home/ghosnp/dataset/mini_kitti/label_2/training/label_2/000011.txt'
+        self.pcd_dir = '/home/jiazx_ug/dataset/' + args.data_path.split('_')[-1] + '/' + args.data_path[0] + '/training/velodyne/'
+        self.txt_dir = '/home/jiazx_ug/dataset/' + args.data_path.split('_')[-1] + '/' + args.data_path[0] + '/training/label_2/'
+        
+        print('pcd_dir: ', self.pcd_dir)
+        print('txt_dir: ', self.txt_dir)
+        
+        self.save_path = './../ada_tools/iter_pcc/'+args.data_path+'('+args.model_path+').txt'
 
         self.voxel_size = torch.tensor([0.16, 0.16, 4])
         self.pc_range = torch.tensor([-69.12, -39.68, -3., 69.12, 39.68, 1.])
@@ -110,6 +136,19 @@ class exp:
         self.clf.fit(vfe_pfn_weight.T)
 
         return
+    
+    def get_vfe_pfn_weight(self, model):
+        vfe_pfn_weight_gpu = model.vfe.pfn_layers[0].linear.weight
+        vfe_pfn_weight = vfe_pfn_weight_gpu.detach().cpu().numpy()
+
+        return vfe_pfn_weight
+    
+    def get_vfe_pfn_norm_weight(self,model):
+        for name, param in model.named_parameters():
+            if name == 'vfe.pfn_layers.0.norm.weight':
+                vfe_pfn_norm_weight = param.detach().cpu().numpy()
+                break
+        return vfe_pfn_norm_weight
 
     def load_data(self, pcd_path):
         single_dataset = demo.DemoDataset(dataset_cfg=cfg.DATA_CONFIG, class_names=cfg.CLASS_NAMES, training=False,
@@ -122,7 +161,27 @@ class exp:
                 self.trans_data_2_tensor(data_dict)
 
         return data_dict
+
+    # Jaccard Coefficient for multi-dimensional vectors
+
+    def jaccard_coefficient(self,v1, v2):
+        intersection = np.sum(v1*v2)
+        union = np.sum(v1) + np.sum(v2) - intersection
+
+        return intersection / union
     
+    def cal_PCC(self,a,b):
+        # a,b are two vectors, both are numpy array(64,)
+        a_mean = np.mean(a)
+        b_mean = np.mean(b)
+        a_std = np.std(a)
+        b_std = np.std(b)
+        a = (a - a_mean) / a_std
+        b = (b - b_mean) / b_std
+
+        pcc = np.sum(a * b) / (64 - 1)
+        return pcc
+
     def get_feature_idx(self, txt_path):
         corners_bevs = []
 
@@ -180,36 +239,56 @@ class exp:
     def iter_get_s4(self):
         pcd_dir, txt_dir = self.pcd_dir, self.txt_dir
         model = self.load_model_paras()
-        self.fit_hyper_plane(model)
-        dist_dict = {}
-        mean_dist = []
+        mean_pccs = []
         tick = time.time()
         print('start')
-        for pcd_path in glob.glob(pcd_dir + '*.bin'):
-            txt_path = txt_dir + pcd_path.split('/')[-1].split('.')[0] + '.txt'
-            print('pcd_path: ', pcd_path)
-            iter_data_dict = self.load_data(pcd_path)
-            all_features = self.vfe_process(iter_data_dict)
-            feature_idx = self.get_feature_idx(txt_path)
-            feature_idx_gpu = torch.from_numpy(feature_idx).cuda()
-            spatial_features_gpu = all_features[0]
 
-            vaild_features_gpu = spatial_features_gpu[:, feature_idx_gpu[:,1], feature_idx_gpu[:,0]]
-            vaild_feature = vaild_features_gpu.detach().numpy().T
+        vfe_feature = self.get_vfe_pfn_norm_weight(model)
 
-            dists = np.abs(self.clf.decision_function(vaild_feature))
-            dist_dict[pcd_path] = dists
-            mean_dist.append(np.mean(dists))
-            print('time: ', time.time() - tick, 's')
-            tick = time.time()
+        # save the dists
+        with open(self.save_path, 'w') as save_f:
+            
 
 
-        return dist_dict, mean_dist
+            # for i in tqdm(range(len(glob.glob(pcd_dir + '*.bin')))):
+            #     pcd_path = glob.glob(pcd_dir + '*.bin')[i]
+
+            for pcd_path in glob.glob(pcd_dir + '*.bin'):
+                txt_path = txt_dir + pcd_path.split('/')[-1].split('.')[0] + '.txt'
+                print('pcd_path: ', pcd_path)
+                iter_data_dict = self.load_data(pcd_path)
+                all_features = self.vfe_process(iter_data_dict)
+                feature_idx = self.get_feature_idx(txt_path)
+                if feature_idx.ndim != 1:
+                    feature_idx_cpu = feature_idx[feature_idx[:,0] < 496]
+                    feature_idx_cpu = feature_idx[feature_idx[:,1] < 864]
+                spatial_features_cpu = all_features[0]
+
+                vaild_features_gpu = spatial_features_cpu[:, feature_idx_cpu[:,1], feature_idx_cpu[:,0]]
+                vaild_feature = vaild_features_gpu.detach().numpy().T
+                
+                new_valid_features = []
+                for i in range(vaild_feature.shape[0]):
+                    if np.sum(vaild_feature[i]) != 0:
+                        new_valid_features.append(vaild_feature[i])
+
+                
+                pearsons = [self.cal_PCC(vfe_feature, feature) for feature in new_valid_features]
+                #jaccards = [self.jaccard_coefficient(vfe_feature, feature) for feature in vaild_feature]
+                mean_pccs.append(np.mean(pearsons))
+                print('time: ', round(time.time() - tick,3), 'jc', np.mean(pearsons))
+                tick = time.time()
+                
+                file_idx = pcd_path.split('/')[-1].split('.')[0]
+                save_f.write(file_idx + ' ' + str(np.mean(pearsons)) + '\n')
+        
+        return mean_pccs
     
 if __name__ == '__main__':
     s4_exp = exp()
-    dist_dict, mean_dist = s4_exp.iter_get_s4()
-    print(mean_dist)
+    mean_dist = s4_exp.iter_get_s4()
+    #print(mean_dist)
+    print('Done')
     
 
         

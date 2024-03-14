@@ -67,17 +67,30 @@ def get_pr(pred, gt, ap_thresh,ftype, conf_thresh):
 
     return ps, rs
 
-def get_map(pred_list, gt_list, ap_thresh,ftype ,conf_thresh):
+def get_map(idx_list, pred_list, gt_list, ap_thresh,ftype ,conf_thresh,kind):
     aps = {'Car': 0, 'Pedestrian': 0, 'Rider': 0, 'Truck': 0, 'Van': 0}
     ps = {'Car': 0, 'Pedestrian': 0, 'Rider': 0, 'Truck': 0, 'Van': 0}
     rs = {'Car': 0, 'Pedestrian': 0, 'Rider': 0, 'Truck': 0, 'Van': 0}
+
+    save_aps = []
+
+    if kind == 'hard':
+        save_path = '/home/jiazx_ug/OpenPCDet/tools/self_eval/hard_result.txt'
+    else:
+        save_path = '/home/jiazx_ug/OpenPCDet/tools/self_eval/normal_result.txt'
+
 
     for i in range(len(pred_list)):
         pred = pred_list[i]
         gt = gt_list[i]
         ps, rs = get_pr(pred, gt, ap_thresh, ftype ,conf_thresh)
+        save_aps.append(ps['Car']* rs['Car'])
         for label_keys in pred.keys():
             aps[label_keys] += ps[label_keys] * rs[label_keys]
+
+    with open(save_path, 'w') as file:
+        for i in range(len(save_aps)):
+            file.write(str(idx_list[i]) + ' ' + str(save_aps[i]) + '\n')
 
     for label_keys in pred.keys():
         aps[label_keys] /= len(pred_list)
@@ -116,7 +129,7 @@ def test_read_data(file_idx):
     pred_list.append(predict_dict)
     gt_list.append(gt_dict)
 
-    mAP = get_map(pred_list, gt_list, 0.5,'3d', CONF_THRESH)
+    mAP = get_map(pred_list, gt_list, 0.5,'3d', CONF_THRESH, 'hard')
 
     return mAP
 
@@ -125,9 +138,10 @@ def test_all_data(ap_thresh, dist_thresh, ftype, kind):
     # gt_dir = './../label_2/'
     # pkl_path = './../kitti_infos_val.pkl'
 
-    predict_dir = '/home/jiazx_ug/OpenPCDet/output/cfgs/kitti_models/voxel_rcnn_car/default/eval/epoch_160/val/default/final_result/data/'
+    predict_dir = '/home/jiazx_ug/OpenPCDet/output/cfgs/kitti_models/pointpillar_copy/default/eval/epoch_240/val/default/final_result/data/'
     gt_dir = '/home/jiazx_ug/OpenPCDet/data/kitti/training/label_2/'
     pkl_path = '/home/jiazx_ug/OpenPCDet/data/kitti/kitti_infos_val.pkl'
+
 
     # only consider the id of the file in predict_2
     file_idx = os.listdir(predict_dir)
@@ -136,13 +150,16 @@ def test_all_data(ap_thresh, dist_thresh, ftype, kind):
     with open(pkl_path, 'rb') as file:
         gt_pkl = pickle.load(file)
 
-    pred_list, gt_list = [], []
+    pred_list, gt_list, idx_list = [], [], []
 
-
+    
     for i in range(len(file_idx)):
-        idx = file_idx[i]
+        # idx = file_idx[i]
+        # output gt_pkl idx
+        print(gt_pkl[i]['image']['image_idx'])
+        idx = str(gt_pkl[i]['image']['image_idx'])
         num_gts = gt_pkl[i]['annos']['num_points_in_gt']
-
+        idx_list.append(idx)
         predict_dict = { 'Car': [], 'Pedestrian': [], 'Rider': [], 'Truck': [], 'Van': [] }
         gt_dict = { 'Car': [], 'Pedestrian': [], 'Rider': [], 'Truck': [], 'Van': [] }
 
@@ -188,7 +205,7 @@ def test_all_data(ap_thresh, dist_thresh, ftype, kind):
         pred_list.append(predict_dict)
         gt_list.append(gt_dict)
 
-    mAP = get_map(pred_list, gt_list, ap_thresh, ftype ,CONF_THRESH)
+    mAP = get_map(idx_list, pred_list, gt_list, ap_thresh, ftype ,CONF_THRESH,kind)
 
     return mAP
     
@@ -197,7 +214,7 @@ def main():
     maps_n, maps_h = [], []
     for i in metric:
         maps_n.append(test_all_data(i/100, 100, '3d', 'normal'))
-        maps_h.append(test_all_data(i/100, 100, '2d', 'hard'))
+        maps_h.append(test_all_data(i/100, 100, '3d', 'hard'))
 
 
     index3d = ['mAP@' + str(i) + '_normal'for i in metric]

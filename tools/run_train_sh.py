@@ -14,10 +14,10 @@ while True:
 
     if meminfo.free / 1024**2 > 10000:
         subprocess.run(['bash', "./scripts/dist_train_pp.sh" , "4"])
-        atexit.register(run_next_task)
+        # atexit.register(run_next_task)
     else:
-        print("{} was used, waiting for 30 seconds".format(meminfo.used / 1024**2))
-        time.sleep(30)
+        print("{} was used, waiting for 1 seconds".format(meminfo.used / 1024**2))
+        time.sleep(1)
 
 
 
