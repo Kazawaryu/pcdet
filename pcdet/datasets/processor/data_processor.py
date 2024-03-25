@@ -45,6 +45,7 @@ class VoxelGeneratorWrapper():
             )
 
     def generate(self, points):
+        print(len(points))
         if self.spconv_ver == 1:
             voxel_output = self._voxel_generator.generate(points)
             if isinstance(voxel_output, dict):
@@ -60,6 +61,8 @@ class VoxelGeneratorWrapper():
             voxels = tv_voxels.numpy()
             coordinates = tv_coordinates.numpy()
             num_points = tv_num_points.numpy()
+
+            # print(coordinates.shape)
         return voxels, coordinates, num_points
 
 

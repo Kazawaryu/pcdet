@@ -2,6 +2,7 @@ from functools import partial
 
 import os
 import torch
+import numpy as np
 from pcdet.utils.spconv_utils import spconv
 import torch.nn as nn
 
@@ -109,8 +110,8 @@ class VoxelBackBone8xFocal(nn.Module):
         self.sparse_shape = grid_size[::-1] + [1, 0, 0]
 
         self.conv_input = spconv.SparseSequential(
-            spconv.SubMConv3d(input_channels, 16, 3, padding=1, bias=False, indice_key='subm1').to(4),
-            norm_fn(16).to(4),
+            spconv.SubMConv3d(input_channels, 16, 3, padding=1, bias=False, indice_key='subm1').to(0),
+            norm_fn(16).to(0),
             nn.ReLU(True),
         )
 
@@ -200,6 +201,23 @@ class VoxelBackBone8xFocal(nn.Module):
         }
         
         self.forward_ret_dict = {}
+
+    def change_sp2cpu(self, sp_input_res):
+        features = sp_input_res.features.cpu().detach().numpy()
+        indices = sp_input_res.indices.cpu().detach().numpy()
+        # make sure the elements in indices are integer
+        indices = indices.astype(np.int32)
+        spatial_shape = sp_input_res.spatial_shape
+        batch_size = sp_input_res.batch_size
+
+        sp_cpu = spconv.SparseConvTensor(
+            features=features,
+            indices=indices,
+            spatial_shape=spatial_shape,
+            batch_size=batch_size
+        )
+
+        return sp_cpu
         
     def get_loss(self, tb_dict=None):
         loss = self.forward_ret_dict['loss_box_of_pts']
@@ -218,20 +236,8 @@ class VoxelBackBone8xFocal(nn.Module):
             spatial_shape=self.sparse_shape,
             batch_size=batch_size
         )
-        # input_sp_tensor (torch.size=(16000,4)), need to convert format, then input conv_input
-        
-        # print input_sp_tensor all layers shape
-        # print('='*60)
-        # print(input_sp_tensor)
-        # print('='*60)
-
-        # x = self.conv_input(input_sp_tensor)
-
-        return input_sp_tensor
-     
-
-    def get_input_16_dims_features(self, input_sp_tensor):
         x = self.conv_input(input_sp_tensor)
+
         return x
 
     def forward(self, batch_dict):
