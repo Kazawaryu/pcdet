@@ -93,7 +93,8 @@ def get_map(idx_list, pred_list, gt_list, ap_thresh,ftype ,conf_thresh,kind):
             file.write(str(idx_list[i]) + ' ' + str(save_aps[i]) + '\n')
 
     for label_keys in pred.keys():
-        aps[label_keys] /= len(pred_list)
+        aps[label_keys] /= len(pred_list) 
+        aps[label_keys] *= 100
     
     return aps
 

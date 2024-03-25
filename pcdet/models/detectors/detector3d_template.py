@@ -32,7 +32,8 @@ class Detector3DTemplate(nn.Module):
     def update_global_step(self):
         self.global_step += 1
 
-    def build_networks(self):
+    def build_networks(self, ret=False):
+
         model_info_dict = {
             'module_list': [],
             'num_rawpoint_features': self.dataset.point_feature_encoder.num_point_features,
@@ -42,12 +43,16 @@ class Detector3DTemplate(nn.Module):
             'voxel_size': self.dataset.voxel_size,
             'depth_downsample_factor': self.dataset.depth_downsample_factor
         }
+    
         for module_name in self.module_topology:
             module, model_info_dict = getattr(self, 'build_%s' % module_name)(
                 model_info_dict=model_info_dict
             )
             self.add_module(module_name, module)
-        return model_info_dict['module_list']
+        if not ret:
+            return model_info_dict['module_list']
+        else:
+            return model_info_dict['module_list'], model_info_dict
 
     def build_vfe(self, model_info_dict):
         if self.model_cfg.get('VFE', None) is None:
