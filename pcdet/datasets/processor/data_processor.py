@@ -16,7 +16,7 @@ except:
 class VoxelGeneratorWrapper():
     def __init__(self, vsize_xyz, coors_range_xyz, num_point_features, max_num_points_per_voxel, max_num_voxels):
         # print all parameters
-        print(vsize_xyz, coors_range_xyz, num_point_features, max_num_points_per_voxel, max_num_voxels)
+        # print(vsize_xyz, coors_range_xyz, num_point_features, max_num_points_per_voxel, max_num_voxels)
         try:
             from spconv.utils import VoxelGeneratorV2 as VoxelGenerator
             self.spconv_ver = 1

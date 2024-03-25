@@ -1,5 +1,6 @@
 from functools import partial
 
+import os
 import torch
 from pcdet.utils.spconv_utils import spconv
 import torch.nn as nn
@@ -101,15 +102,15 @@ class SparseBasicBlock(spconv.SparseModule):
 class VoxelBackBone8xFocal(nn.Module):
     def __init__(self, model_cfg, input_channels, grid_size, **kwargs):
         super().__init__()
-        self.model_cfg = model_cfg
 
+        self.model_cfg = model_cfg
         norm_fn = partial(nn.BatchNorm1d, eps=1e-3, momentum=0.01)
 
         self.sparse_shape = grid_size[::-1] + [1, 0, 0]
 
         self.conv_input = spconv.SparseSequential(
-            spconv.SubMConv3d(input_channels, 16, 3, padding=1, bias=False, indice_key='subm1'),
-            norm_fn(16),
+            spconv.SubMConv3d(input_channels, 16, 3, padding=1, bias=False, indice_key='subm1').to(4),
+            norm_fn(16).to(4),
             nn.ReLU(True),
         )
 
@@ -207,6 +208,32 @@ class VoxelBackBone8xFocal(nn.Module):
         tb_dict['loss_box_of_pts'] = loss.item()
         return loss, tb_dict
 
+    def get_input_layer_result(self, voxel_features, voxel_coords,batch_size=None):
+        if batch_size is None:
+            batch_size = voxel_coords[:, 0].max().int().item() + 1
+
+        input_sp_tensor = spconv.SparseConvTensor(
+            features=voxel_features,
+            indices=voxel_coords.int(),
+            spatial_shape=self.sparse_shape,
+            batch_size=batch_size
+        )
+        # input_sp_tensor (torch.size=(16000,4)), need to convert format, then input conv_input
+        
+        # print input_sp_tensor all layers shape
+        # print('='*60)
+        # print(input_sp_tensor)
+        # print('='*60)
+
+        # x = self.conv_input(input_sp_tensor)
+
+        return input_sp_tensor
+     
+
+    def get_input_16_dims_features(self, input_sp_tensor):
+        x = self.conv_input(input_sp_tensor)
+        return x
+
     def forward(self, batch_dict):
         """
         Args:
@@ -226,7 +253,6 @@ class VoxelBackBone8xFocal(nn.Module):
             spatial_shape=self.sparse_shape,
             batch_size=batch_size
         )
-
         loss_img = 0
 
         x = self.conv_input(input_sp_tensor)
