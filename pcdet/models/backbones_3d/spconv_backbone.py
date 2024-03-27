@@ -76,8 +76,8 @@ class VoxelBackBone8x(nn.Module):
         self.sparse_shape = grid_size[::-1] + [1, 0, 0]
 
         self.conv_input = spconv.SparseSequential(
-            spconv.SubMConv3d(input_channels, 16, 3, padding=1, bias=False, indice_key='subm1'),
-            norm_fn(16),
+            spconv.SubMConv3d(input_channels, 16, 3, padding=1, bias=False, indice_key='subm1').to(0),
+            norm_fn(16).to(0),
             nn.ReLU(),
         )
         block = post_act_block
@@ -123,6 +123,18 @@ class VoxelBackBone8x(nn.Module):
             'x_conv3': 64,
             'x_conv4': 64
         }
+
+
+    def get_input_layer_result(self,voxel_features, voxel_coords, batch_size):
+        input_sp_tensor = spconv.SparseConvTensor(
+            features=voxel_features,
+            indices=voxel_coords.int(),
+            spatial_shape=self.sparse_shape,
+            batch_size=batch_size
+        )
+
+        x = self.conv_input(input_sp_tensor)
+        return x
 
 
 
