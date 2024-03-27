@@ -133,6 +133,10 @@ class VoxelBackBone8x(nn.Module):
             batch_size=batch_size
         )
 
+        print('feature:',input_sp_tensor.features.shape)
+        print('indices',input_sp_tensor.indices.shape)
+        print('sp_shape',input_sp_tensor.spatial_shape)
+
         x = self.conv_input(input_sp_tensor)
         return x
 
