@@ -76,8 +76,8 @@ class VoxelBackBone8x(nn.Module):
         self.sparse_shape = grid_size[::-1] + [1, 0, 0]
 
         self.conv_input = spconv.SparseSequential(
-            spconv.SubMConv3d(input_channels, 16, 3, padding=1, bias=False, indice_key='subm1').to(0),
-            norm_fn(16).to(0),
+            spconv.SubMConv3d(input_channels, 16, 3, padding=1, bias=False, indice_key='subm1'),
+            norm_fn(16),
             nn.ReLU(),
         )
         block = post_act_block
