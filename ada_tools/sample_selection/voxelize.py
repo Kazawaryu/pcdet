@@ -126,16 +126,20 @@ def get_inner_voxel(corners_voxelaxis, checker):
 
     return feature_keys
 
-def get_inner_voxel_feature(voxel_features, indices_3d, feature_keys, grid_size):
+def get_inner_voxel_feature(voxel_features, indices_3d, feature_keys, grid_size, label_obj):
     features = []
-    for obj in feature_keys:
+    labels = []
+    for i in range(len(feature_keys)):
+        obj = feature_keys[i]
+        lab = label_obj[i]
         for key in obj:
             if key[0] < 0 or key[0] >= grid_size[0] or key[1] < 0 or key[1] >= grid_size[1] or key[2] < 0 or key[2] >= grid_size[2]:
                 continue    
             indice = indices_3d[key[0], key[1], key[2]]
             features.append(voxel_features[indice])
+            labels.append(lab)
     
-    return features
+    return features, labels
 
 
 def read_data(path):
@@ -144,17 +148,19 @@ def read_data(path):
     return points
 
 def read_label(path):
-    # Attention: here use KITTI label format
+    # Attention: here use self-KITTI label format
+    label_dict = {'Car':0, 'Pedestrian':1, 'Rider':2, 'Truck':3, 'Van':4}
     with open(path, 'r') as f:
-        labels = f.readlines()
+        label_lines = f.readlines()
 
     corners_3Ds = []
+    labels = []
 
-    for line in labels:
+    for line in label_lines :
         line = line.split()
         lab, x, y, z, w, l, h, rot = line[0], line[11], line[12], line[13], line[9], line[10], line[8], line[14]
         h, w, l, x, y, z, rot = map(float, [h, w, l, x, y, z, rot])
-        
+
         if lab != 'DontCare':
             x_corners = [l / 2, l / 2, -l / 2, -l / 2, l / 2, l / 2, -l / 2, -l / 2]
             y_corners = [0, 0, 0, 0, -h, -h, -h, -h]
@@ -171,7 +177,8 @@ def read_label(path):
             # transform the 3d bbox from camera_0 coordinate to velodyne coordinate
             corners_3d = corners_3d[:, [2, 0, 1]] * np.array([[1, -1, -1]])
             corners_3Ds.append(corners_3d)
-
-    return corners_3Ds
+            labels.append(label_dict[lab])
+            
+    return corners_3Ds, labels
 
 
