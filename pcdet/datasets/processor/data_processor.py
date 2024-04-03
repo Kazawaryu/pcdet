@@ -45,7 +45,7 @@ class VoxelGeneratorWrapper():
             )
 
     def generate(self, points):
-        print(len(points))
+        # print(len(points))
         if self.spconv_ver == 1:
             voxel_output = self._voxel_generator.generate(points)
             if isinstance(voxel_output, dict):

@@ -52,6 +52,15 @@ class isPointInQuadrangle(object):
 
         return self.__isInQuadrangleFlag
 
+def load_model_params(ckpt_path, model):
+    trained_dict = torch.load(ckpt_path)
+    model_dict = model.state_dict()
+    state_dict = {k:v for k,v in trained_dict.items() if k in model_dict.keys()}
+    model_dict.update(state_dict)
+    model.load_state_dict(model_dict)
+
+    return model
+
 def create_voxel(points, vsize_xyz, coors_range_xyz,num_point_features ,max_num_points_per_voxel, max_num_voxels):
     voxel_generator = VoxelGenerator(
                 vsize_xyz=vsize_xyz,
@@ -178,7 +187,7 @@ def read_label(path):
             corners_3d = corners_3d[:, [2, 0, 1]] * np.array([[1, -1, -1]])
             corners_3Ds.append(corners_3d)
             labels.append(label_dict[lab])
-            
+
     return corners_3Ds, labels
 
 

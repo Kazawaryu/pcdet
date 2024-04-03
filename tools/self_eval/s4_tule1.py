@@ -146,6 +146,7 @@ def test_all_data(ap_thresh, dist_thresh, ftype, kind):
     file_idx = os.listdir(predict_dir)
     file_idx = [x.split('.')[0] for x in file_idx]
     file_idx.sort()
+    file_coef = []
     with open(pkl_path, 'rb') as file:
         gt_pkl = pickle.load(file)
 
@@ -172,9 +173,11 @@ def test_all_data(ap_thresh, dist_thresh, ftype, kind):
                 lab, _, _, _, _, _, _, _, h, w, l, x, y, z, rot, conf = line
                 conf = float(conf)
                 box = [float(x), float(y), float(z), float(h), float(w), float(l), float(rot)]
-                if conf > CONF_THRESH:
-                    predict_dict[lab].append(box)
+            
+                predict_dict[lab].append(box)
+                file_coef.append((idx,lab,conf))
         print(gt_path)
+
         with open(gt_path, 'r') as file:
             gt_lines = file.readlines()
             for j in range(len(gt_lines)-1):
@@ -206,14 +209,18 @@ def test_all_data(ap_thresh, dist_thresh, ftype, kind):
 
     mAP = get_map(idx_list, pred_list, gt_list, ap_thresh, ftype ,CONF_THRESH,kind)
 
-    return mAP
+    return mAP, file_coef
     
 def main():
     metric = [70,50,25]
     maps_n, maps_h = [], []
     for i in metric:
-        maps_n.append(test_all_data(i/100, 100, '3d', 'normal'))
-        maps_h.append(test_all_data(i/100, 100, '3d', 'hard'))
+        mapsn,coefn = test_all_data(i/100, 100, '3d', 'normal')
+        mapsh,coefh = test_all_data(i/100, 100, '3d', 'hard')
+        maps_n.append(mapsn)
+        maps_h.append(mapsh)
+        # maps_n.append(test_all_data(i/100, 100, '3d', 'normal'))
+        # maps_h.append(test_all_data(i/100, 100, '3d', 'hard'))
 
 
     index3d = ['mAP@' + str(i) + '_normal'for i in metric]
