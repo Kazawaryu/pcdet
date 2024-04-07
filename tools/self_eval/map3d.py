@@ -2,7 +2,8 @@ import os
 import numpy as np
 import pandas as pd
 import pickle
-
+import argparse
+import tqdm
 import iou3d
 
 CONF_THRESH = 0 # confidence threshold
@@ -132,15 +133,16 @@ def test_read_data(file_idx):
 
     return mAP
 
-def test_all_data(ap_thresh, dist_thresh, ftype, kind):
+def test_all_data(model_type,epochs,ap_thresh, dist_thresh, ftype, kind):
     # predict_dir = './../predict_2/'
     # gt_dir = './../label_2/'
     # pkl_path = './../kitti_infos_val.pkl'
 
-    predict_dir = '/home/jiazx_ug/OpenPCDet/output/cfgs/kitti_models/pointpillar_copy/default/eval/epoch_240/val/default/final_result/data/'
+    predict_dir = '/home/jiazx_ug/OpenPCDet/output/cfgs/kitti_models/'+model_type+'/default/eval/epoch_'+epochs+'/train/default/final_result/data/'
     gt_dir = '/home/jiazx_ug/OpenPCDet/data/kitti/training/label_2/'
-    pkl_path = '/home/jiazx_ug/OpenPCDet/data/kitti/kitti_infos_val.pkl'
+    pkl_path = '/home/jiazx_ug/OpenPCDet/data/kitti/kitti_infos_train.pkl'
 
+    print(predict_dir)
 
     # only consider the id of the file in predict_2
     file_idx = os.listdir(predict_dir)
@@ -151,11 +153,11 @@ def test_all_data(ap_thresh, dist_thresh, ftype, kind):
 
     pred_list, gt_list, idx_list = [], [], []
 
-    
-    for i in range(len(file_idx)):
+    for i in tqdm.tqdm(range(len(file_idx))):
+    # for i in range(len(file_idx)):
         # idx = file_idx[i]
         # output gt_pkl idx
-        print(gt_pkl[i]['image']['image_idx'])
+        # print(gt_pkl[i]['image']['image_idx'])
         idx = str(gt_pkl[i]['image']['image_idx'])
         num_gts = gt_pkl[i]['annos']['num_points_in_gt']
         idx_list.append(idx)
@@ -174,7 +176,7 @@ def test_all_data(ap_thresh, dist_thresh, ftype, kind):
                 box = [float(x), float(y), float(z), float(h), float(w), float(l), float(rot)]
                 if conf > CONF_THRESH:
                     predict_dict[lab].append(box)
-        print(gt_path)
+        # print(gt_path)
         with open(gt_path, 'r') as file:
             gt_lines = file.readlines()
             for j in range(len(gt_lines)-1):
@@ -207,13 +209,22 @@ def test_all_data(ap_thresh, dist_thresh, ftype, kind):
     mAP = get_map(idx_list, pred_list, gt_list, ap_thresh, ftype ,CONF_THRESH,kind)
 
     return mAP
+
+def read_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--model_type','-m', type=str, default='pointpillar', help='model type')
+    parser.add_argument('--epochs','-e', type=str, default='50', help='epochs')
+    return parser.parse_args()
     
 def main():
     metric = [70,50,25]
     maps_n, maps_h = [], []
+    args = read_args()
+    model_type = args.model_type
+    epochs = args.epochs
     for i in metric:
-        maps_n.append(test_all_data(i/100, 100, '3d', 'normal'))
-        maps_h.append(test_all_data(i/100, 100, '3d', 'hard'))
+        maps_n.append(test_all_data(model_type,epochs,i/100, 100, '3d', 'normal'))
+        maps_h.append(test_all_data(model_type,epochs,i/100, 100, '3d', 'hard'))
 
 
     index3d = ['mAP@' + str(i) + '_normal'for i in metric]
@@ -223,6 +234,7 @@ def main():
 
     # combine 3d and 2d
     ap_df = pd.concat([ap3d_df, ap2d_df])
+    # 打印结果，用逗号分隔
     print(ap_df.T)
 
 
