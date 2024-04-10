@@ -17,7 +17,7 @@ from pcdet.utils import common_utils
 from train_utils.optimization import build_optimizer, build_scheduler
 from train_utils.train_utils import train_model
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "2,3,4,5"
+os.environ["CUDA_VISIBLE_DEVICES"] = "3,4,5,0"
 # os.environ["CUDA_VISIBLE_DEVICES"] = "3,4,5"
 
 def parse_config():
